@@ -20,10 +20,22 @@ struct LocationRecord: Codable, Sendable {
     var latitude: Double; var longitude: Double; var accuracy: Double
 }
 struct StitchSettings: Codable, Sendable {
-    var width = 4096
+    var width = 6144 // Matches the decoded frames' angular resolution and the viewer's default zoom at about 1:1.
     var includeFrames = false
     var nadirCap = false
-    var refinement = false
+    var refinement = false // Wide alignment search for captures with large sensor drift.
+    var enhance = true
+}
+extension StitchSettings {
+    // Keys added after the first release decode with defaults so older captures still open.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self), d = StitchSettings()
+        width = try c.decodeIfPresent(Int.self, forKey: .width) ?? d.width
+        includeFrames = try c.decodeIfPresent(Bool.self, forKey: .includeFrames) ?? d.includeFrames
+        nadirCap = try c.decodeIfPresent(Bool.self, forKey: .nadirCap) ?? d.nadirCap
+        refinement = try c.decodeIfPresent(Bool.self, forKey: .refinement) ?? d.refinement
+        enhance = try c.decodeIfPresent(Bool.self, forKey: .enhance) ?? d.enhance
+    }
 }
 struct Hotspot: Codable, Identifiable, Sendable {
     var id = UUID().uuidString.lowercased()

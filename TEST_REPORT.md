@@ -1,6 +1,6 @@
 # MIRAS Capture verification report
 
-Latest follow-up: [core debugging checkpoint](checkpoints/D-core-debugging.md). The updated suite passes **22 tests**. The active toolchain is now Xcode 27.1; the full build is blocked by its missing Metal component, and no simulator runtime is available. The historical verification below used Xcode 26.3. See the checkpoint for the fixes, current commands/logs, and the limits of the latest compile check.
+Latest: [stitch quality checkpoint](checkpoints/E-stitch-quality.md), 28 October 2026, Xcode 27.1. The suite passes **33 tests** with `swift test -c release` on macOS and with `xcodebuild test` on the iOS 27.1 simulator (iPhone 18 Pro Max), including the Metal/CPU agreement test. The unsigned generic iOS device build and build-for-testing succeed without Swift warnings. This resolves the simulator and Metal toolchain blockers described in the [core debugging checkpoint](checkpoints/D-core-debugging.md) and below. Real-iPhone capture, performance and memory remain unverified. The historical verification below used Xcode 26.3.
 
 Verified in this project folder on 28 October 2026 with Xcode 26.3 (17C529) and Apple Swift 6.2.4, using Swift 5.9 language mode for the iOS project. XcodeGen 2.46.0 and Apple's Metal toolchain were installed during implementation.
 

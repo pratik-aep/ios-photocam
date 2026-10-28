@@ -35,8 +35,13 @@ import UIKit
                 let result = try await stitcher.stitch(capture) { value in Task { @MainActor in self.progress = value } }
                 try Task.checkCancellation()
                 var c = capture; c.stitched = true; c.stitchedSettings = c.settings; c.coverage = result.coverage
-                if result.coverage < 0.98 { c.warnings.append("Incomplete coverage: uncovered areas have a blurred fill.") }
-                if !result.usedMetal { c.warnings.append("Stitched with CPU fallback.") }
+                // Stitch notes describe the latest stitch only; capture notes are kept.
+                let coverageNote = "Incomplete coverage: uncovered areas have a blurred fill.", cpuNote = "Stitched with CPU fallback."
+                let detailNote = "Few matching details between photos; alignment relied mostly on motion sensors."
+                c.warnings.removeAll { [coverageNote, cpuNote, detailNote].contains($0) }
+                if result.coverage < 0.98 { c.warnings.append(coverageNote) }
+                if !result.usedMetal { c.warnings.append(cpuNote) }
+                if let a = result.alignment, a.matches < 3*c.frames.count { c.warnings.append(detailNote) }
                 let url = CaptureStore.folder(c.id).appending(path: "panorama.jpg")
                 let image = result.image, poseHeading: Double? = c.yawReference == "trueNorth" ? 0 : nil
                 try await Task.detached { try ImageCodec.jpeg(image, heading: poseHeading, to: url) }.value

@@ -79,7 +79,8 @@ struct DetailView: View {
     }
     private func loadPreview() async {
         let url = CaptureStore.folder(document.id).appending(path:"panorama.jpg")
-        do { previewImage = try await Task.detached { try ImageCodec.cgImage(ImageCodec.decode(url,maxSize:4096)) }.value }
+        // Full stitched resolution: a 4096 preview of a 6144 panorama looks soft at the default zoom.
+        do { previewImage = try await Task.detached { try ImageCodec.cgImage(ImageCodec.decode(url,maxSize:8192)) }.value }
         catch { previewError = error.localizedDescription }
     }
     private func persist() { let value = document; Task { await library.save(value) } }
@@ -90,8 +91,9 @@ struct DetailView: View {
                 Picker("Panorama width",selection:$document.settings.width) { ForEach([2048,4096,6144],id:\.self) { Text("\($0) px").tag($0) } }
                 Toggle("Include raw frames in export",isOn:$document.settings.includeFrames)
                 Toggle("MIRAS nadir cap",isOn:$document.settings.nadirCap)
-                Toggle("Refine rotations (slower)",isOn:$document.settings.refinement)
-                Text("Size, cap, and refinement apply on the next stitch.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Enhance colour and detail",isOn:$document.settings.enhance)
+                Toggle("Wide alignment search (slower)",isOn:$document.settings.refinement)
+                Text("Size, cap, enhancement and alignment apply on the next stitch.").font(.caption).foregroundStyle(.secondary)
                 if !document.warnings.isEmpty { Section("Capture notes") { ForEach(document.warnings,id:\.self) { Text($0) } } }
                 if document.stitched {
                     Button("Save panorama to Photos",systemImage:"photo.badge.plus") {

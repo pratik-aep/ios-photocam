@@ -139,7 +139,8 @@ final class IntegrationTests: XCTestCase {
         XCTAssertLessThan(error,0.002)
     }
     func testPoseRecordsStitchAtNorth() async throws {
-        var capture = CaptureDocument(); capture.settings.width = 512; capture.referenceWorldYaw = 37; capture.yawReference = "trueNorth"
+        // Enhancement intentionally shifts tone; this test measures geometry against the reference colours.
+        var capture = CaptureDocument(); capture.settings.width = 512; capture.settings.enhance = false; capture.referenceWorldYaw = 37; capture.yawReference = "trueNorth"
         let frames = SyntheticFixture.frames(width:320,height:240)
         try await CaptureStore.shared.save(capture)
         defer { let id = capture.id; Task { try? await CaptureStore.shared.delete(id) } }
@@ -156,6 +157,37 @@ final class IntegrationTests: XCTestCase {
         let result = try await StitchService().stitch(capture,cpu:true,progress:{ _ in })
         let metrics = SyntheticFixture.metrics(result.image)
         XCTAssertLessThan(metrics.meanAbsoluteError,0.06); XCTAssertLessThanOrEqual(abs(metrics.bestHorizontalShift),2); XCTAssertGreaterThanOrEqual(result.coverage,0.98)
+    }
+    func testEnhancementKeepsOrientationAndWrap() async throws {
+        let frames = Reprojection.compensate(SyntheticFixture.frames(width:320,height:240))
+        let service = StitchService()
+        let plain = try await service.render(frames:frames,width:512,cpu:true,progress:{ _ in }).image
+        let enhanced = try await service.render(frames:frames,width:512,cpu:true,enhance:true,progress:{ _ in }).image
+        let w = plain.width, h = plain.height
+        // Tone changes keep the luminance structure; a flipped or shifted render would not correlate.
+        func correlation(flipped: Bool) -> Double {
+            var a: [Double] = [], b: [Double] = []
+            for y in 0..<h { for x in 0..<w {
+                let i = (y*w+x)*4, j = ((flipped ? h-1-y : y)*w+x)*4
+                a.append(Double(enhanced.rgba[i])+Double(enhanced.rgba[i+1])+Double(enhanced.rgba[i+2])); b.append(Double(plain.rgba[j])+Double(plain.rgba[j+1])+Double(plain.rgba[j+2]))
+            } }
+            let ma = a.reduce(0,+)/Double(a.count), mb = b.reduce(0,+)/Double(b.count)
+            let cross = zip(a,b).reduce(0.0) { $0+($1.0-ma)*($1.1-mb) }, va = a.reduce(0.0) { $0+($1-ma)*($1-ma) }, vb = b.reduce(0.0) { $0+($1-mb)*($1-mb) }
+            return cross/sqrt(va*vb)
+        }
+        XCTAssertGreaterThan(correlation(flipped:false), 0.9)
+        XCTAssertGreaterThan(correlation(flipped:false), correlation(flipped:true)+0.3)
+        for i in stride(from:3,to:enhanced.rgba.count,by:4) { XCTAssertEqual(enhanced.rgba[i],255) }
+        var wrap = 0.0, interior = 0.0
+        for y in 0..<h { for c in 0..<3 {
+            wrap += abs(Double(enhanced.rgba[y*w*4+c])-Double(enhanced.rgba[(y*w+w-1)*4+c]))
+            interior += abs(Double(enhanced.rgba[(y*w+w/2)*4+c])-Double(enhanced.rgba[(y*w+w/2-1)*4+c]))
+        } }
+        XCTAssertLessThan(wrap, interior*2+Double(h))
+    }
+    func testOlderSettingsDecodeWithDefaults() throws {
+        let settings = try JSONDecoder().decode(StitchSettings.self, from: Data(#"{"width":2048,"includeFrames":true,"nadirCap":false,"refinement":false}"#.utf8))
+        XCTAssertEqual(settings.width,2048); XCTAssertTrue(settings.includeFrames); XCTAssertTrue(settings.enhance)
     }
     func testMissingNadirFillAndLogoKeepsHorizon() async throws {
         let all = Reprojection.compensate(SyntheticFixture.frames(width:160,height:120))

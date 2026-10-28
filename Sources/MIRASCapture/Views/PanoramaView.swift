@@ -27,6 +27,8 @@ import simd
         let sphere = PanoramaMesh.make()
         let material = SCNMaterial(); material.diffuse.contents = image; material.lightingModel = .constant; material.isDoubleSided = false
         material.diffuse.wrapS = .repeat
+        // Trilinear, anisotropic sampling keeps zoomed-out and steep views free of shimmer and blur.
+        material.diffuse.mipFilter = .linear; material.diffuse.maxAnisotropy = 16
         sphere.firstMaterial = material
         let node = SCNNode(geometry: sphere); node.name = "panorama"; scene.rootNode.addChildNode(node)
         updateCamera()

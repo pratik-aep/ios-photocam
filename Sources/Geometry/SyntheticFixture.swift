@@ -25,21 +25,33 @@ public enum SyntheticFixture {
         } }
         return .init(width: width, height: h, rgba: bytes)
     }
-    public static func frames(width: Int = 1920, height: Int = 1440, source: RasterImage? = nil) -> [RasterFrame] {
+    /// True camera poses behind `frames`.
+    public static func poses(width: Int = 1920, height: Int = 1440) -> [Projection] {
+        ShotPlanner.plan(horizontalFOV: 2*atan(Double(width)/Double(height)*tan(63 * .pi/360))*180 / .pi, verticalFOV: 63)
+            .map { Projection.virtual(angle: $0.angle, width: width, height: height, verticalFOV: 63) }
+    }
+    /// Frames rendered from the true poses but recorded with deterministic yaw/pitch error up to `noise` and roll error
+    /// up to `roll` degrees, and a recorded focal length off by the fraction `focalError`. A positive `veil` adds up to
+    /// that much linear-light glare to about half of the frames, as a bright window does.
+    public static func frames(width: Int = 1920, height: Int = 1440, source: RasterImage? = nil, noise: Double = 0.5, roll: Double = 0, focalError: Double = 0, veil: Float = 0) -> [RasterFrame] {
         let plan = ShotPlanner.plan(horizontalFOV: 2*atan(Double(width)/Double(height)*tan(63 * .pi/360))*180 / .pi, verticalFOV: 63)
         return plan.enumerated().map { index, target in
             let actual = Projection.virtual(angle: target.angle, width: width, height: height, verticalFOV: 63)
-            let noiseYaw = sin(Double(index)*12.9898)*0.5, noisePitch = cos(Double(index)*7.832)*0.5
-            let recorded = Projection.virtual(angle: .init(yaw: target.angle.yaw+noiseYaw, pitch: target.angle.pitch+noisePitch), width: width, height: height, verticalFOV: 63)
-            let gain = Float(1+0.15*sin(Double(index)*2.39996))
+            let noiseYaw = sin(Double(index)*12.9898)*noise, noisePitch = cos(Double(index)*7.832)*noise
+            var recorded = Projection.virtual(angle: .init(yaw: target.angle.yaw+noiseYaw, pitch: target.angle.pitch+noisePitch), width: width, height: height, verticalFOV: 63)
+            let r = Float(sin(Double(index)*3.71)*roll * .pi/180), x = recorded.x, y = recorded.y, f = Float(1+focalError)
+            recorded.x = .init(cos(r)*x.x+sin(r)*y.x, cos(r)*x.y+sin(r)*y.y, cos(r)*x.z+sin(r)*y.z, x.w*f)
+            recorded.y = .init(-sin(r)*x.x+cos(r)*y.x, -sin(r)*x.y+cos(r)*y.y, -sin(r)*x.z+cos(r)*y.z, y.w*f)
+            let gain = Float(1+0.15*sin(Double(index)*2.39996)), glare = veil*max(0, Float(sin(Double(index)*1.7)))
             var bytes = [UInt8](repeating: 255, count: width*height*4)
             for y in 0..<height { for x in 0..<width {
                 let d = actual.direction(x: Float(x), y: Float(y))
-                let c: SIMD3<Float>
+                var c: SIMD3<Float>
                 if let source {
                     let uv = SphericalAngle(vector: .init(Double(d.x),Double(d.y),Double(d.z))).uv
                     c = source.sample(x: Float(uv.u)*Float(source.width-1), y: Float(uv.v)*Float(source.height-1))*gain
                 } else { c = color(d)*gain }
+                if glare > 0 { c = SIMD3(Reprojection.encoded(Reprojection.linear(c.x)+glare), Reprojection.encoded(Reprojection.linear(c.y)+glare), Reprojection.encoded(Reprojection.linear(c.z)+glare)) }
                 let i = (y*width+x)*4
                 bytes[i] = UInt8(clamping: Int(c.x*255)); bytes[i+1] = UInt8(clamping: Int(c.y*255)); bytes[i+2] = UInt8(clamping: Int(c.z*255))
             } }
