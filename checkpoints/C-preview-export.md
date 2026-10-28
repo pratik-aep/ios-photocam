@@ -1,0 +1,5 @@
+# Milestone C checkpoint
+
+Implemented dark SwiftUI onboarding and library, persisted capture statuses, SceneKit panorama preview with explicit inward-facing UV mesh, drag/pinch/motion viewing, tap-ray hotspot placement, editing, dragging, deletion, proximity warnings, validation and exact MIRAS JSON export. Includes streaming standard ZIP output, optional raw frames, Files/share sheet, Photos saving and retry, debug sample capture, and synthetic stitch results.
+
+The verification suite exercises production export services, validates JSON keys and yaw rounding, reads GPano XMP back, checks ZIP integrity and exact internal paths, and renders SceneKit views to compare the displayed panorama with hotspot tap rays. These tests run on the Mac using the shared production services. Both iOS application and test bundle compile/link against the simulator SDK when the environment-blocked asset-catalog compilation step is temporarily excluded; the Metal shader is compiled normally. Full simulator execution is blocked by the missing runtime; no simulator test pass is claimed. See TEST_REPORT.md.

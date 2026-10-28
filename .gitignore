@@ -1,0 +1,17 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcodeproj/
+*.xcresult/
+checkpoints/*.log
+build/
+checkpoints/sdkcheck/
+.build-validation/
+.swiftpm/
+runtime-download/
+xcuserdata/
+*.xcuserstate
+.env
+.env.*
+*.p12
+*.mobileprovision
